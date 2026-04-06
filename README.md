@@ -37,7 +37,7 @@ SAMonIQ9/
 ## Step 1 — Clone the repo
 
 ```bash
-git clone <your_repo_url>
+git clone https://github.com/MushfiqShovon/Conv-LoRA-SAM-on-IQ-9.git
 cd SAMonIQ9
 ```
 
