@@ -23,8 +23,15 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
-# ----- Dataset images (add only CSVs to git, not image/label files) -----
-datasets/images/*
-datasets/labels/*
-!datasets/images/.gitkeep
-!datasets/labels/.gitkeep
+# ----- Dataset: track CSV/txt metadata, ignore image files -----
+# Images/labels must be downloaded manually (see README.md)
+datasets/**/*.png
+datasets/**/*.jpg
+datasets/**/*.jpeg
+datasets/**/*.tif
+datasets/**/*.tiff
+datasets/**/*.bmp
+# Keep CSVs, note files, and placeholder dirs
+!datasets/**/*.csv
+!datasets/**/*.txt
+!datasets/**/.gitkeep

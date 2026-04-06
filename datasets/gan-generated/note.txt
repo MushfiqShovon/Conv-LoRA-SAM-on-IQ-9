@@ -1,0 +1,8 @@
+Input (Image)
+Metal --> 1  Defect --> 0
+
+Lable 1 (Metal segmentor)
+Metal --> 1 Defect 0
+
+Label 2/3 (Defect segmentor)
+Defect --> 1  Metal 0

@@ -11,21 +11,27 @@ so autogluon is NOT needed on the device.
 Directory layout expected:
   SAMonIQ9/
   ├── dlc/
-  │   ├── convlora_sam_encoder_ptq.dlc
-  │   └── convlora_sam_decoder_ptq.dlc
+  │   ├── convlora_sam_encoder_ptq.dlc    ← download from Google Drive (see README.md)
+  │   └── convlora_sam_decoder_ptq.dlc    ← download from Google Drive (see README.md)
   ├── embeddings/
   │   ├── image_pe.npy
   │   ├── no_prompt_dense.npy
   │   └── no_prompt_sparse.npy
   ├── datasets/
-  │   ├── images/     ← put your test images here
-  │   ├── labels/     ← put your ground truth masks here (.png, grayscale)
-  │   └── test.csv    ← CSV with columns: image, label (relative paths)
+  │   └── gan-generated/
+  │       ├── test1/, test2/, ... test6/   ← download images from Google Drive (see README.md)
+  │       │   ├── input/     ← test images (.png)
+  │       │   ├── class_1/   ← ground truth masks (.png)
+  │       │   ├── class_2/
+  │       │   └── class_3/
+  │       ├── test1_class1.csv  ← already in git (image/label column pairs)
+  │       └── ...               (18 CSVs total)
   └── work/           ← runtime I/O (auto-created)
 
 Usage:
     python3 evaluate_on_device.py \
-        --data_csv datasets/test.csv \
+        --data_name test2_class2 \
+        [--dataset_dir datasets/gan-generated] \
         [--snpe_root /path/to/snpe_sdk]   # optional, if snpe-net-run not in PATH
         [--use_cpu]                        # fallback to CPU (no --use_dsp)
         [--max_images 5]
@@ -291,20 +297,22 @@ def main(args):
         sys.exit(1)
 
     # ---- Load test CSV ----
+    dataset_dir = os.path.join(repo, args.dataset_dir)
+    data_csv    = os.path.join(dataset_dir, f"{args.data_name}.csv")
     import csv
     rows = []
-    with open(args.data_csv, newline="") as f:
+    with open(data_csv, newline="") as f:
         reader = csv.DictReader(f)
         for row in reader:
             rows.append(row)
     if args.max_images > 0:
         rows = rows[:args.max_images]
-    logger.info(f"Loaded {len(rows)} samples from {args.data_csv}")
+    logger.info(f"Loaded {len(rows)} samples from {data_csv}")
 
-    # Resolve paths relative to CSV location
-    csv_dir = os.path.dirname(os.path.abspath(args.data_csv))
+    # Resolve image/label paths relative to dataset_dir
+    # (CSVs store paths like  test2/input/image.png  relative to gan-generated/)
     def abs_path(p):
-        return p if os.path.isabs(p) else os.path.join(csv_dir, p)
+        return p if os.path.isabs(p) else os.path.join(dataset_dir, p)
 
     # ---- Prompt embeddings ----
     pe_raw     = os.path.join(work_dir, "image_pe.raw")
@@ -383,8 +391,9 @@ def main(args):
     logger.info("=" * 55)
 
     # Save results
-    out_txt = os.path.join(results_dir, "iou_results.txt")
+    out_txt = os.path.join(results_dir, f"iou_{args.data_name}.txt")
     with open(out_txt, "w") as f:
+        f.write(f"Dataset: {args.data_name}\n")
         f.write(f"Runtime: {'NPU/HTP (--use_dsp)' if use_dsp else 'CPU'}\n")
         f.write(f"Images evaluated: {len(ious)}\n")
         f.write(f"Mean IoU: {mean_iou:.4f}\n")
@@ -400,8 +409,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Conv-LoRA SAM DLC evaluation on IQ-9075 NPU"
     )
-    parser.add_argument("--data_csv",   default="datasets/test.csv",
-                        help="CSV with 'image' and 'label' columns (relative or absolute paths)")
+    parser.add_argument("--data_name",  default="test2_class2",
+                        help="CSV name without extension, e.g. test2_class2 (inside --dataset_dir)")
+    parser.add_argument("--dataset_dir", default="datasets/gan-generated",
+                        help="Path (relative to repo root) containing CSV files and image subdirs")
     parser.add_argument("--snpe_root",  default=None,
                         help="Path to SNPE SDK root (optional if snpe-net-run is in PATH)")
     parser.add_argument("--use_cpu",    action="store_true",
