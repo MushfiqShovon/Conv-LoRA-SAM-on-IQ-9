@@ -1,0 +1,30 @@
+# ----- Large model files (use git LFS or copy manually) -----
+# Track with LFS:  git lfs install && git lfs track "*.dlc"
+dlc/*.dlc
+
+# ----- Runtime / generated files -----
+work/raw_images/
+work/encoder_output/
+work/decoder_output/
+work/*.raw
+work/**/*.raw
+work/**/*.bin
+
+# Do NOT ignore work/results/ (save IoU output)
+!work/results/
+
+# ----- Python cache -----
+__pycache__/
+*.pyc
+*.pyo
+.Python
+
+# ----- OS files -----
+.DS_Store
+Thumbs.db
+
+# ----- Dataset images (add only CSVs to git, not image/label files) -----
+datasets/images/*
+datasets/labels/*
+!datasets/images/.gitkeep
+!datasets/labels/.gitkeep
