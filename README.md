@@ -38,7 +38,7 @@ SAMonIQ9/
 
 ```bash
 git clone https://github.com/MushfiqShovon/Conv-LoRA-SAM-on-IQ-9.git
-cd SAMonIQ9
+cd Conv-LoRA-SAM-on-IQ-9
 ```
 
 ---
