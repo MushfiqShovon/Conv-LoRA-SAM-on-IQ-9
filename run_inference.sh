@@ -33,6 +33,12 @@ if [[ -z "$PYTHON" ]]; then
     exit 1
 fi
 
+# Install required Python packages if missing
+echo "Checking Python dependencies ..."
+$PYTHON -c "import PIL" 2>/dev/null || $PYTHON -m pip install --user pillow -q
+$PYTHON -c "import scipy" 2>/dev/null || $PYTHON -m pip install --user scipy -q
+$PYTHON -c "import numpy" 2>/dev/null || $PYTHON -m pip install --user numpy -q
+
 # Check DLC files exist
 if [[ ! -f "dlc/convlora_sam_encoder_ptq.dlc" || ! -f "dlc/convlora_sam_decoder_ptq.dlc" ]]; then
     echo "ERROR: DLC files not found in dlc/"
