@@ -187,11 +187,15 @@ def calculate_iou(pred, gt):
 # SNPE inference
 # =====================================================================
 
-def run_encoder(snpe_bin, dlc_path, raw_files, enc_out_dir, use_dsp, snpe_env, timeout=600):
+def run_encoder(snpe_bin, dlc_path, raw_files, enc_out_dir, use_dsp, snpe_env,
+                htp_cache_dir=None, timeout=7200):
     """Run encoder one image at a time."""
     os.makedirs(enc_out_dir, exist_ok=True)
     total = len(raw_files)
     logger.info(f"  Running encoder on {total} images ({'NPU/DSP' if use_dsp else 'CPU'}) ...")
+    if use_dsp:
+        logger.info("  NOTE: First NPU run compiles the model for the HTP — this can take")
+        logger.info("        30-90 minutes. Subsequent runs load from cache and are fast.")
 
     for idx, raw_path in enumerate(raw_files):
         input_txt = os.path.join(enc_out_dir, f"_in_{idx}.txt")
@@ -207,6 +211,9 @@ def run_encoder(snpe_bin, dlc_path, raw_files, enc_out_dir, use_dsp, snpe_env, t
                "--perf_profile", "balanced"]
         if use_dsp:
             cmd.append("--use_dsp")
+        if htp_cache_dir:
+            os.makedirs(htp_cache_dir, exist_ok=True)
+            cmd += ["--storage_dir", htp_cache_dir]
 
         t0 = time.time()
         logger.info(f"  Encoder [{idx+1}/{total}] ...")
@@ -229,7 +236,8 @@ def run_encoder(snpe_bin, dlc_path, raw_files, enc_out_dir, use_dsp, snpe_env, t
     logger.info("Encoder done.")
 
 
-def run_decoder(snpe_bin, dlc_path, n_images, enc_out_dir, static_raws, dec_out_dir, use_dsp, snpe_env, timeout=7200):
+def run_decoder(snpe_bin, dlc_path, n_images, enc_out_dir, static_raws, dec_out_dir, use_dsp, snpe_env,
+                htp_cache_dir=None, timeout=7200):
     """Run decoder for all images in one snpe-net-run call."""
     os.makedirs(dec_out_dir, exist_ok=True)
     pe_raw, sparse_raw, dense_raw = static_raws
@@ -252,6 +260,9 @@ def run_decoder(snpe_bin, dlc_path, n_images, enc_out_dir, static_raws, dec_out_
            "--set_unconsumed_as_output"]
     if use_dsp:
         cmd.append("--use_dsp")
+    if htp_cache_dir:
+        os.makedirs(htp_cache_dir, exist_ok=True)
+        cmd += ["--storage_dir", htp_cache_dir]
 
     logger.info(f"  Running decoder ({n_images} images) ...")
     t0 = time.time()
@@ -273,9 +284,11 @@ def main(args):
     emb_dir    = os.path.join(repo, "embeddings")
     work_dir   = os.path.join(repo, "work")
     raw_dir    = os.path.join(work_dir, "raw_images")
-    enc_out    = os.path.join(work_dir, "encoder_output")
-    dec_out    = os.path.join(work_dir, "decoder_output")
+    enc_out     = os.path.join(work_dir, "encoder_output")
+    dec_out     = os.path.join(work_dir, "decoder_output")
     results_dir = os.path.join(work_dir, "results")
+    # HTP context cache — persists across runs so compilation happens only once
+    htp_cache   = os.path.join(work_dir, "htp_cache")
 
     for d in [raw_dir, enc_out, dec_out, results_dir]:
         os.makedirs(d, exist_ok=True)
@@ -349,7 +362,8 @@ def main(args):
         logger.error(f"Encoder DLC not found: {encoder_dlc}")
         logger.error("Copy the .dlc files into the dlc/ folder.")
         sys.exit(1)
-    run_encoder(snpe_bin, encoder_dlc, raw_files, enc_out, use_dsp, snpe_env)
+    run_encoder(snpe_bin, encoder_dlc, raw_files, enc_out, use_dsp, snpe_env,
+                htp_cache_dir=htp_cache if use_dsp else None)
 
     # ---- Step 3: Decoder ----
     logger.info("=" * 55)
@@ -357,7 +371,8 @@ def main(args):
     logger.info("=" * 55)
     decoder_dlc = os.path.join(dlc_dir, "convlora_sam_decoder_ptq.dlc")
     run_decoder(snpe_bin, decoder_dlc, len(rows), enc_out,
-                (pe_raw, sparse_raw, dense_raw), dec_out, use_dsp, snpe_env)
+                (pe_raw, sparse_raw, dense_raw), dec_out, use_dsp, snpe_env,
+                htp_cache_dir=htp_cache if use_dsp else None)
 
     # ---- Step 4: IoU ----
     logger.info("=" * 55)
