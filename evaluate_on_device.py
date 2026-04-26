@@ -73,32 +73,53 @@ IMAGENET_STD  = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 # Environment helpers
 # =====================================================================
 
+def _pick_snpe_arch(snpe_root):
+    """Pick the best arch sub-directory in the SDK for this machine."""
+    import platform
+    machine = platform.machine()
+    if machine == "x86_64":
+        candidates = ["x86_64-linux-clang"]
+    else:
+        # Prefer gcc11.2 (has V79 HTP stub) over gcc9.4 on aarch64 Linux
+        candidates = [
+            "aarch64-oe-linux-gcc11.2",
+            "aarch64-ubuntu-gcc9.4",
+        ]
+    for arch in candidates:
+        bin_dir = os.path.join(snpe_root, "bin", arch)
+        lib_dir = os.path.join(snpe_root, "lib", arch)
+        if os.path.isdir(bin_dir) and os.path.isdir(lib_dir):
+            return arch, bin_dir, lib_dir
+    # Last-resort: unversioned
+    return None, os.path.join(snpe_root, "bin"), os.path.join(snpe_root, "lib")
+
+
 def get_snpe_env(snpe_root=None):
     """Build env dict for snpe-net-run. snpe_root=None means use PATH."""
     env = os.environ.copy()
     hexagon_dir = os.path.join(REPO_ROOT, "hexagon-v79")
-    if os.path.isdir(hexagon_dir):
-        # Prefer repo's skel libs; fall back to system
-        env["ADSP_LIBRARY_PATH"] = hexagon_dir
+    hexagon_sdk = ""
     if snpe_root:
-        env["PATH"] = os.path.join(snpe_root, "bin") + ":" + env.get("PATH", "")
-        env["LD_LIBRARY_PATH"] = (
-            os.path.join(snpe_root, "lib") + ":" + env.get("LD_LIBRARY_PATH", "")
-        )
+        hexagon_sdk = os.path.join(snpe_root, "lib", "hexagon-v79", "unsigned")
+    if os.path.isdir(hexagon_dir):
+        adsp = hexagon_dir
+        if hexagon_sdk and os.path.isdir(hexagon_sdk):
+            adsp = hexagon_dir + ";" + hexagon_sdk
+        env["ADSP_LIBRARY_PATH"] = adsp
+    if snpe_root:
+        _arch, bin_dir, lib_dir = _pick_snpe_arch(snpe_root)
+        env["PATH"] = bin_dir + ":" + env.get("PATH", "")
+        env["LD_LIBRARY_PATH"] = lib_dir + ":" + env.get("LD_LIBRARY_PATH", "")
     return env
 
 
 def find_snpe_net_run(snpe_root=None):
     """Return path to snpe-net-run binary."""
     if snpe_root:
-        # Try common sub-paths in an installed SDK
-        candidates = [
-            os.path.join(snpe_root, "bin", "snpe-net-run"),
-            os.path.join(snpe_root, "bin", "aarch64-ubuntu-gcc9.4", "snpe-net-run"),
-        ]
-        for c in candidates:
-            if os.path.isfile(c):
-                return c
+        _arch, bin_dir, _lib_dir = _pick_snpe_arch(snpe_root)
+        candidate = os.path.join(bin_dir, "snpe-net-run")
+        if os.path.isfile(candidate):
+            return candidate
     return "snpe-net-run"   # assume it is in PATH
 
 
